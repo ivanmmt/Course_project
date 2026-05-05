@@ -1,2 +1,3 @@
 #ignore vs floder
 .vs/
+.build/
