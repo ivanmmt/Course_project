@@ -1,5 +1,5 @@
 /* =============================================================================
- * gui/apps.c — Apps: About, Calculator (integer), System Info, Launchers
+ * gui/apps.c — Apps: Calculator (integer), System Info, Launchers
  * Калькулятор использует целочисленную арифметику (×1000) без double/float
  * ============================================================================= */
 #include "gui.h"
@@ -15,35 +15,6 @@
 #include "../drivers/timer/pit.h"
 #include "../memory/pmm.h"
 #include "../lib/string.h"
-
-/* ═══════════════════════════════════════════════════════════════════
- * About Box
- * ═══════════════════════════════════════════════════════════════════ */
-static void about_paint(gui_window_t* w) {
-    fb_rect_t cr = gui_client_rect(w);
-    fb_fill_round_rect(cr.x+10,cr.y+10,60,60,8,0x1E5A8Au);
-    fb_draw_string_scaled(cr.x+16,cr.y+18,"My",FB_WHITE,2);
-    fb_draw_string_scaled(cr.x+16,cr.y+38,"OS",0x4FC3F7u,2);
-    fb_draw_string(cr.x+82,cr.y+14,"MyOS",       0x1A3A6Cu,0,true);
-    fb_draw_string(cr.x+82,cr.y+32,"x86 OS",0x666666u,0,true);
-    fb_draw_string(cr.x+82,cr.y+50,"C + Assembly",      0x888888u,0,true);
-    fb_draw_hline(cr.x+10,cr.y+82,cr.w-20,0xCCCCCCu);
-    const char* s[]={"GDT + IDT (Protected Mode)",
-                     "PMM + VMM + Heap",
-                     "Framebuffer + Mouse + GUI",
-                     "VFS + RamFS + ELF loader",
-                     "Editor + Games"};
-    for(int i=0;i<5;i++)
-        fb_draw_string(cr.x+16,cr.y+96+i*18,s[i],0x2266AAu,0,true);
-}
-static void about_close(void* ud){ gui_close_window((gui_window_t*)ud); }
-static gui_window_t* app_about_open(void){
-    gui_window_t* w=gui_create_window("About MyOS",180,100,320,300);
-    if(!w)return (gui_window_t*)0;
-    w->on_paint=about_paint;
-    gui_add_button(w,110,252,80,"Close",about_close,w);
-    return w;
-}
 
 /* ═══════════════════════════════════════════════════════════════════
  * Calculator — целочисленная арифметика с фиксированной точкой ×1000
@@ -226,7 +197,7 @@ static void itoa32(uint32_t n, char* buf) {
 static void sysinfo_paint(gui_window_t* w) {
     fb_rect_t cr = gui_client_rect(w);
     const char* info[]={
-        "OS:     MyOS v0.1.0",
+        "OS:     MyOS 1.0",
         "Arch:   x86 32-bit Protected Mode",
         "GDT:    5 descriptors",
         "IDT:    256 vectors (IRQ@0x20-0x2F)",
@@ -279,7 +250,6 @@ static void launch_editor (void*ud){(void)ud; editor_run("/tmp/untitled.txt");}
 static void launch_snake  (void*ud){(void)ud; snake_run();}
 static void launch_tetris (void*ud){(void)ud; tetris_run();}
 static void launch_pong   (void*ud){(void)ud; pong_run();}
-static void launch_about  (void*ud){(void)ud; app_about_open();}
 static void launch_calc   (void*ud){(void)ud; app_calc_open();}
 static void launch_fm      (void*ud){(void)ud; filemanager_run("/");}
 static void launch_browser (void*ud){(void)ud;
@@ -353,6 +323,5 @@ void apps_handle_icon_click(int32_t mx, int32_t my) {
 }
 
 void apps_init(void){
-    app_about_open();
     app_calc_open();
 }

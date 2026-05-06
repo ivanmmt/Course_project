@@ -264,6 +264,18 @@ static void process_mouse(void) {
     }
 
     /* ── Клик ── */
+    static int click_debug = 0;
+    if (!click_debug) {
+        vga_printf("  [MOUSE] First click detected: mx=%d, my=%d, screen=%dx%d\n", 
+                   mx, my, (int32_t)fb_width(), (int32_t)fb_height());
+        vga_printf("  [MOUSE] Windows: count=%d\n", desktop.window_count);
+        for (int d = 0; d < desktop.window_count && d < 5; d++) {
+            gui_window_t* dw = &desktop.windows[d];
+            vga_printf("    Window %d: active=%d, visible=%d, pos=(%d,%d), size=%dx%d\n",
+                       d, dw->active, dw->visible, dw->x, dw->y, dw->w, dw->h);
+        }
+        click_debug = 1;
+    }
     /* Сначала проверяем клик по WiFi кнопке в таскбаре */
     int32_t sh = (int32_t)fb_height();
     int32_t sw = (int32_t)fb_width();
@@ -282,8 +294,11 @@ static void process_mouse(void) {
     for (int32_t i = (int32_t)desktop.window_count - 1; i >= 0; i--) {
         gui_window_t* w = &desktop.windows[i];
         if (!w->active || !w->visible) continue;
+        vga_printf("    [CHECK] Window %d: pos=(%d,%d)-(%d,%d), click=(%d,%d)\n",
+                   i, w->x, w->y, w->x + w->w, w->y + w->h, mx, my);
         if (mx >= w->x && mx < w->x + w->w &&
             my >= w->y && my < w->y + w->h) {
+            vga_printf("    [HIT] Window %d clicked!\n", i);
             clicked_window = true; break;
         }
     }
@@ -563,6 +578,7 @@ static void wifi_select_paint(gui_window_t* w) {
     if (wifi_select_state.selected_idx >= temp_count) wifi_select_state.selected_idx = 0;
 
     int y_pos = cr.y + 28;
+
     for (int i = 0; i < temp_count && i < 8; i++) {
         fb_color_t color = (i == wifi_select_state.selected_idx) ? 0xFFFF00u : 0x00FF00u;
         fb_color_t bg = (i == wifi_select_state.selected_idx) ? 0x333333u : 0x1A1A1Au;
@@ -572,13 +588,21 @@ static void wifi_select_paint(gui_window_t* w) {
         
         /* Рисуем SSID и уровень сигнала */
         fb_draw_string(cr.x + 4, y_pos, temp_networks[i].ssid, color, 0, true);
-        const char* rssi_str = "[???]";
-        int rssi = temp_networks[i].rssi;
-        if (rssi >= -50) rssi_str = "[Excellent]";
-        else if (rssi >= -70) rssi_str = "[Good]";
-        else if (rssi >= -80) rssi_str = "[Fair]";
-        else rssi_str = "[Weak]";
-        fb_draw_string(cr.x + 200, y_pos, rssi_str, color, 0, true);
+        
+        /* Показываем если это подключенная сеть */
+        extern wifi_config_t wifi_get_current_config(void);
+        wifi_config_t cfg = wifi_get_current_config();
+        if (cfg.security != 0 && strcmp(cfg.ssid, temp_networks[i].ssid) == 0) {
+            fb_draw_string(cr.x + 200, y_pos, "[CONNECTED]", 0x00FF00u, 0, true);
+        } else {
+            const char* rssi_str = "[???]";
+            int rssi = temp_networks[i].rssi;
+            if (rssi >= -50) rssi_str = "[Excellent]";
+            else if (rssi >= -70) rssi_str = "[Good]";
+            else if (rssi >= -80) rssi_str = "[Fair]";
+            else rssi_str = "[Weak]";
+            fb_draw_string(cr.x + 200, y_pos, rssi_str, color, 0, true);
+        }
         y_pos += 18;
     }
     
@@ -596,13 +620,19 @@ static void wifi_select_close(void* ud) {
 
 static void wifi_connect_selected(void* ud) {
     gui_window_t* w = (gui_window_t*)ud;
+    vga_printf("  [GUI] wifi_connect_selected called: idx=%d, count=%d\n", 
+               wifi_select_state.selected_idx, wifi_select_state.network_count);
+    
     if (wifi_select_state.selected_idx >= wifi_select_state.network_count) return;
     
     wifi_network_t* net = &wifi_select_state.networks[wifi_select_state.selected_idx];
+    vga_printf("  [GUI] Connecting to: %s (security=%d)\n", net->ssid, net->security);
     
     if (net->security == WIFI_SECURITY_OPEN) {
         /* Open network - connect directly */
-        wifi_connect(net->ssid, "", WIFI_SECURITY_OPEN);
+        vga_printf("  [GUI] Attempting WiFi connect to open network: %s\n", net->ssid);
+        bool result = wifi_connect(net->ssid, "", WIFI_SECURITY_OPEN);
+        vga_printf("  [GUI] WiFi connect returned: %s\n", result ? "true" : "false");
         gui_close_window(w);
     } else {
         /* WPA2 network - would need password dialog, for now just show message */
@@ -623,23 +653,32 @@ static void wifi_scan_button(void* ud) {
 
 static void wifi_select_on_click(gui_window_t* w, int32_t x, int32_t y) {
     fb_rect_t cr = gui_client_rect(w);
+    vga_printf("  [WIFI_CLICK] Called with x=%d, y=%d\n", x, y);
+    vga_printf("    Client rect: x=%d, y=%d, w=%d, h=%d\n", cr.x, cr.y, cr.w, cr.h);
+    vga_printf("    Networks: count=%d\n", wifi_select_state.network_count);
 
     /* Check if click is on a network item */
     int y_pos = 28;
     for (int i = 0; i < wifi_select_state.network_count && i < 8; i++) {
+        vga_printf("    Checking network %d: y_pos=%d, click_y=%d, range=[%d, %d)\n",
+                   i, y_pos, y, y_pos, y_pos + 18);
         if (x >= 0 && x < cr.w &&
             y >= y_pos && y < y_pos + 18) {
+            vga_printf("  [GUI] Network %d SELECTED: %s\n", i, wifi_select_state.networks[i].ssid);
             wifi_select_state.selected_idx = i;
             wifi_connect_selected(w);
             return;
         }
         y_pos += 18;
     }
+    vga_printf("  [GUI] Click not on any network item\n");
 }
 
 gui_window_t* gui_create_wifi_dialog(void) {
     gui_window_t* w = gui_create_window("WiFi Connect", 150, 150, 400, 300);
     if (!w) return (gui_window_t*)0;
+    vga_printf("  [WIFI_DIALOG] Created window: ptr=%p, pos=(%d,%d), size=%dx%d, active=%d, visible=%d\n",
+               w, w->x, w->y, w->w, w->h, w->active, w->visible);
     
     memset(&wifi_select_state, 0, sizeof(wifi_select_state));
     
@@ -650,6 +689,10 @@ gui_window_t* gui_create_wifi_dialog(void) {
     /* Получаем список сетей - нужно передать размер буфера! */
     wifi_select_state.network_count = 16;  /* Размер буфера */
     wifi_get_networks(wifi_select_state.networks, &wifi_select_state.network_count);
+    vga_printf("  [GUI] Dialog opened: found %d networks\n", wifi_select_state.network_count);
+    for (int i = 0; i < wifi_select_state.network_count && i < 5; i++) {
+        vga_printf("    Network %d: %s (security=%d)\n", i, wifi_select_state.networks[i].ssid, wifi_select_state.networks[i].security);
+    }
     wifi_select_state.selected_idx = 0;
     
     w->on_paint = wifi_select_paint;

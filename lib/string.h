@@ -8,6 +8,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 size_t  strlen(const char* s);
 char*   strcpy(char* dst, const char* src);
@@ -24,5 +25,6 @@ void*   memmove(void* dst, const void* src, size_t size);
 int     memcmp(const void* a, const void* b, size_t n);
 
 int     itoa(int n, char* buf, int base);
+int     snprintf(char* buf, size_t size, const char* fmt, ...);
 
 #endif /* STRING_H */

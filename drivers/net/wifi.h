@@ -77,6 +77,9 @@ bool wifi_present(void);
 /* Получить статус подключения */
 wifi_status_t wifi_get_status(void);
 
+/* Получить текущую конфигурацию подключения */
+wifi_config_t wifi_get_current_config(void);
+
 /* Сканировать доступные сети */
 bool wifi_scan(void);
 

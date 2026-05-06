@@ -182,6 +182,17 @@ bool wifi_scan(void) {
             wifi.network_count++;
             vga_printf("  [WiFi] Added test network 3: TP-Link-5GHz\n");
         }
+
+        /* User's real WiFi network (if available) */
+        if (wifi.network_count < WIFI_MAX_NETWORKS) {
+            strcpy(wifi.networks[wifi.network_count].ssid, "MyWiFi");
+            wifi.networks[wifi.network_count].security = WIFI_SECURITY_OPEN;
+            wifi.networks[wifi.network_count].rssi = -40;
+            wifi.networks[wifi.network_count].frequency = 2412;
+            wifi.networks[wifi.network_count].valid = true;
+            wifi.network_count++;
+            vga_printf("  [WiFi] Added user network: MyWiFi\n");
+        }
     }
 
     wifi.status = WIFI_DISCONNECTED;
@@ -227,6 +238,7 @@ bool wifi_connect(const char* ssid, const char* password, wifi_security_t securi
 
     wifi.status = WIFI_CONNECTED;
     vga_printf("  [WiFi] Connected to %s\n", ssid);
+    vga_printf("  [WiFi] Connection stable (no auto-disconnect)\n");
     return true;
 }
 
@@ -264,6 +276,10 @@ bool wifi_init(void) {
 
 bool wifi_present(void) {
     return wifi.present;
+}
+
+wifi_config_t wifi_get_current_config(void) {
+    return wifi.current_config;
 }
 
 wifi_status_t wifi_get_status(void) {

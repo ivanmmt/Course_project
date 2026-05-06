@@ -493,7 +493,7 @@ void shell_run(void) {
 
                 vga_put_string("  Resolving example.com... ");
                 uint32_t dns_ip = 0;
-                if (net_dns_resolve("example.com", &dns_ip)) {
+                if (net_dns_resolve("example.com", &dns_ip, 5000)) {
                     vga_printf("OK (%d.%d.%d.%d)\n",
                         (dns_ip>>24)&0xFF,(dns_ip>>16)&0xFF,
                         (dns_ip>>8)&0xFF,dns_ip&0xFF);
@@ -526,7 +526,7 @@ void shell_run(void) {
                     }
                     if(!is_ip) {
                         vga_printf("  Resolving %s...\n", h);
-                        if(!net_dns_resolve(h,&ip)){
+                        if(!net_dns_resolve(h,&ip,5000)){
                             vga_printf("  DNS failed for %s\n",h);
                             goto ping_done;
                         }

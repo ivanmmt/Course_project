@@ -102,3 +102,68 @@ int itoa(int n, char* buf, int base) {
     buf[j] = '\0';
     return j;
 }
+
+/* Simple snprintf implementation for basic format strings */
+int snprintf(char* buf, size_t size, const char* fmt, ...) {
+    if (!buf || size == 0) return 0;
+    
+    va_list args;
+    va_start(args, fmt);
+    
+    size_t pos = 0;
+    const char* p = fmt;
+    
+    while (*p && pos < size - 1) {
+        if (*p == '%' && *(p+1)) {
+            p++;
+            char spec = *p;
+            
+            if (spec == 's') {
+                /* String argument */
+                const char* s = va_arg(args, const char*);
+                if (!s) s = "(null)";
+                while (*s && pos < size - 1) {
+                    buf[pos++] = *s++;
+                }
+            } else if (spec == 'd' || spec == 'i') {
+                /* Integer argument */
+                int n = va_arg(args, int);
+                char tmp[32];
+                int len = itoa(n, tmp, 10);
+                for (int i = 0; i < len && pos < size - 1; i++) {
+                    buf[pos++] = tmp[i];
+                }
+            } else if (spec == 'x' || spec == 'X') {
+                /* Hex argument */
+                unsigned int n = va_arg(args, unsigned int);
+                char tmp[32];
+                int len = itoa((int)n, tmp, 16);
+                for (int i = 0; i < len && pos < size - 1; i++) {
+                    buf[pos++] = (spec == 'X') ? tmp[i] : tmp[i];
+                }
+            } else if (spec == '%') {
+                /* Literal % */
+                buf[pos++] = '%';
+            } else {
+                /* Unknown spec, just copy it */
+                buf[pos++] = '%';
+                if (pos < size - 1) buf[pos++] = spec;
+            }
+            p++;
+        } else if (*p == '\\' && *(p+1)) {
+            /* Escape sequence */
+            p++;
+            if (*p == 'n') buf[pos++] = '\n';
+            else if (*p == 't') buf[pos++] = '\t';
+            else if (*p == 'r') buf[pos++] = '\r';
+            else buf[pos++] = *p;
+            p++;
+        } else {
+            buf[pos++] = *p++;
+        }
+    }
+    
+    buf[pos] = '\0';
+    va_end(args);
+    return (int)pos;
+}

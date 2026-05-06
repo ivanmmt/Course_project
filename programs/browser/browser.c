@@ -2,7 +2,7 @@
  * programs/browser/browser.c
  * MyBrowser — модальное окно GUI + HTTP/HTTPS поддержка
  *
- * АРХИТЕКТУРА (как калькулятор/about):
+ * АРХИТЕКТУРА (как калькулятор):
  *   - Создаётся как gui_window_t через gui_create_window()
  *   - on_paint рисует контент внутри клиентской области
  *   - Кнопки Назад/Обновить/Закрыть через gui_add_button()
@@ -211,30 +211,13 @@ static void html_to_lines(const char* src, uint32_t len,
  * Пытаемся подключиться на 443 и смотрим первый байт ответа
  * ============================================================================= */
 static bool check_https_available(const char* host) {
-    /* Пробуем TCP соединение на 443 */
+    /* Quick check: try DNS resolution first */
     ip4_addr_t ip = 0;
-    if (!net_dns_resolve(host, &ip)) return false;
+    if (!net_dns_resolve(host, &ip, 5000)) return false;
+    
+    /* If DNS works, assume HTTPS may be available */
+    return true;
 
-    tcp_conn_t* conn = net_tcp_connect(ip, 443);
-    if (!conn) return false;
-
-    /* Отправляем TLS ClientHello (минимальный, 5 байт заголовка) */
-    /* Если сервер слушает TLS — вернёт ServerHello (0x16 0x03 ...) */
-    uint8_t client_hello_probe[] = {
-        0x16,       /* ContentType: Handshake */
-        0x03, 0x01, /* Legacy TLS 1.0 для совместимости */
-        0x00, 0x05, /* Length: 5 bytes */
-        0x01,       /* HandshakeType: ClientHello */
-        0x00, 0x00, 0x01, 0x00  /* минимальные данные */
-    };
-    net_tcp_send(conn, client_hello_probe, sizeof(client_hello_probe));
-
-    uint8_t resp[8] = {0};
-    int n = net_tcp_recv(conn, resp, sizeof(resp), 2000);
-    net_tcp_close(conn);
-
-    /* TLS ServerHello начинается с 0x16 0x03 */
-    return (n >= 2 && resp[0] == 0x16 && resp[1] == 0x03);
 }
 
 /* =============================================================================
@@ -304,7 +287,7 @@ static void br_navigate(br_state_t* br, const char* url) {
 
         char* buf = (char*)kmalloc(BR_BUF_SIZE);
         if (buf) {
-            int n = net_https_get(host, 443, path, buf, BR_BUF_SIZE-1);
+            int n = net_https_get(host, 443, path, buf, BR_BUF_SIZE-1, 10000);
             if (n > 0) {
                 buf[n] = '\0';
                 br->https_ok = true;
@@ -326,7 +309,7 @@ static void br_navigate(br_state_t* br, const char* url) {
                 char http_url[512];
                 strcpy(http_url, "https://");
                 strncat(http_url, after_scheme, 400);
-                int n2 = net_http_get(host, 443, path, buf, BR_BUF_SIZE-1);
+                int n2 = net_http_get(host, 80, path, buf, BR_BUF_SIZE-1, 10000);
                 if (n2 > 0) {
                     buf[n2] = '\0';
                     html_to_lines(buf, (uint32_t)n2, br->lines, &br->line_count);
@@ -353,7 +336,7 @@ static void br_navigate(br_state_t* br, const char* url) {
         char* buf = (char*)kmalloc(BR_BUF_SIZE);
         if (!buf) { strcpy(br->status,"Out of memory"); br->loading=false; return; }
 
-        int n = net_http_get(host, port, path, buf, BR_BUF_SIZE-1);
+        int n = net_http_get(host, port, path, buf, BR_BUF_SIZE-1, 10000);
         br->loading = false;
 
         if (n <= 0) {

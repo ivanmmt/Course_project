@@ -62,7 +62,8 @@ SRCS_C := \
   memory/pmm.c memory/vmm.c memory/heap.c \
   filesystem/vfs.c filesystem/ramfs.c filesystem/elf.c \
   filesystem/fat32/fat32.c filesystem/pe/pe.c \
-  net/net.c \
+  net/net.c net/net_core.c net/net_arp.c net/net_ip.c net/net_icmp.c \
+  net/net_udp.c net/net_tcp.c net/net_dns.c net/net_http.c net/net_tls.c \
   gui/gui.c gui/apps.c \
   programs/shell/shell.c programs/editor/editor.c \
   programs/games/snake.c programs/games/tetris.c programs/games/pong.c \
