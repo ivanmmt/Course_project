@@ -24,6 +24,7 @@
 #include "../../kernel/process/process.h"
 #include "../../memory/heap.h"
 #include "../../lib/string.h"
+#include "../../programs/codeeditor/codeeditor.h"
 
 /* ─── Константы UI ─── */
 #define FM_TITLE_H      28    /* заголовок окна */
@@ -79,6 +80,7 @@ typedef struct {
     bool     is_exe;   /* ELF или PE */
     bool     is_pe;    /* Windows PE */
     bool     is_text;
+    bool     is_code;
     bool     is_image;
 } fm_entry_t;
 
@@ -156,7 +158,7 @@ static void fm_detect_type(fm_entry_t* e) {
              strcmp(ext,"hpp")==0  || strcmp(ext,"HPP")==0 ||
              strcmp(ext,"cc")==0   || strcmp(ext,"CC")==0 ||
              strcmp(ext,"cxx")==0  || strcmp(ext,"CXX")==0 ||
-             strcmp(ext,"cs")==0   || strcmp(ext,"CS")==0) { e->is_text=true; }
+             strcmp(ext,"cs")==0   || strcmp(ext,"CS")==0) { e->is_code=true; }
     /* Скриптовые языки */
     else if (strcmp(ext,"py")==0   || strcmp(ext,"PY")==0 ||
              strcmp(ext,"js")==0   || strcmp(ext,"JS")==0 ||
@@ -167,11 +169,12 @@ static void fm_detect_type(fm_entry_t* e) {
              strcmp(ext,"sh")==0   || strcmp(ext,"SH")==0 ||
              strcmp(ext,"bash")==0 || strcmp(ext,"BASH")==0 ||
              strcmp(ext,"bat")==0  || strcmp(ext,"BAT")==0 ||
-             strcmp(ext,"ps1")==0  || strcmp(ext,"PS1")==0) { e->is_text=true; }
-    /* Ассемблер и конфиги */
+             strcmp(ext,"ps1")==0  || strcmp(ext,"PS1")==0) { e->is_code=true; }
+    /* Ассемблер */
     else if (strcmp(ext,"asm")==0  || strcmp(ext,"ASM")==0 ||
-             strcmp(ext,"s")==0    || strcmp(ext,"S")==0 ||
-             strcmp(ext,"cfg")==0  || strcmp(ext,"CFG")==0 ||
+             strcmp(ext,"s")==0    || strcmp(ext,"S")==0) { e->is_code=true; }
+    /* Конфиги и разметка */
+    else if (strcmp(ext,"cfg")==0  || strcmp(ext,"CFG")==0 ||
              strcmp(ext,"conf")==0 || strcmp(ext,"CONF")==0 ||
              strcmp(ext,"yml")==0  || strcmp(ext,"YML")==0 ||
              strcmp(ext,"yaml")==0 || strcmp(ext,"YAML")==0 ||
@@ -255,6 +258,7 @@ static void fm_load_dir(const char* path) {
         e->is_exe = false;
         e->is_pe  = false;
         e->is_text= false;
+        e->is_code= false;
         e->is_image=false;
 
         if (!e->is_dir) fm_detect_type(e);
@@ -294,6 +298,7 @@ static const char* fm_icon(const fm_entry_t* e, fb_color_t* color) {
     if (e->is_dir)   { *color = ICON_COLOR_FOLDER; return ICON_FOLDER; }
     if (e->is_pe)    { *color = 0x4080FFu;          return ICON_EXE; }
     if (e->is_exe)   { *color = ICON_COLOR_EXE;     return ICON_EXE; }
+    if (e->is_code)  { *color = ICON_COLOR_TXT;     return ICON_TXT; }
     if (e->is_text)  { *color = ICON_COLOR_TXT;     return ICON_TXT; }
     if (e->is_image) { *color = ICON_COLOR_IMG;     return ICON_IMG; }
     *color = ICON_COLOR_FILE; return ICON_FILE;
@@ -624,22 +629,39 @@ static void fm_open_selected(void) {
         if (strcmp(full_path,"/")!=0) strncat(full_path,"/",2);
         strncat(full_path, e->name, FM_PATH_MAX-strlen(full_path)-1);
 
+        gui_terminal_capture_start();
+
         if (e->is_pe) {
             /* PE/EXE */
             pe_info_t pi = pe_load_file(full_path);
             if (pi.valid) {
                 char* pe_argv[2] = {full_path, (char*)0};
                 pe_exec(&pi, 1, pe_argv);
+            } else {
+                const char* msg = "Unable to load PE executable.\n";
+                gui_terminal_capture_write(msg, (uint32_t)strlen(msg));
             }
         } else {
             /* ELF */
             char* argv[] = {full_path, (char*)0};
             process_exec(full_path, 1, argv);
         }
+
+        gui_terminal_capture_finish();
         return;
     }
 
-    /* Текстовый файл — открываем в редакторе */
+    /* Код/программа — открываем в кодовом редакторе */
+    if (e->is_code) {
+        char full_path[FM_PATH_MAX];
+        strncpy(full_path, fm.current_path, FM_PATH_MAX-1);
+        if (strcmp(full_path,"/")!=0) strncat(full_path,"/",2);
+        strncat(full_path, e->name, FM_PATH_MAX-strlen(full_path)-1);
+        codeeditor_run(full_path);
+        return;
+    }
+
+    /* Текстовый файл — открываем в обычном текстовом редакторе */
     if (e->is_text) {
         extern void editor_run(const char* filepath);
         char full_path[FM_PATH_MAX];

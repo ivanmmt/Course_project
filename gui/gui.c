@@ -470,9 +470,11 @@ gui_window_t* gui_create_window(const char* title,
     win->w       = w;  win->h = h;
     win->active  = true;
     win->visible = true;
-    win->focused = (desktop.focused_idx < 0);
-    if (win->focused)
-        desktop.focused_idx = (int32_t)(desktop.window_count - 1);
+    if (desktop.focused_idx >= 0) {
+        desktop.windows[desktop.focused_idx].focused = false;
+    }
+    win->focused = true;
+    desktop.focused_idx = (int32_t)(desktop.window_count - 1);
 
     return win;
 }
@@ -482,16 +484,50 @@ void gui_close_window(gui_window_t* win) {
 }
 
 /* ─── Terminal Window ─── */
+#define TERM_OUTPUT_SIZE 8192
+
 typedef struct {
     char    cmd_buf[256];
     int     cmd_pos;
-    char    output[2048];
+    char    output[TERM_OUTPUT_SIZE];
     int     output_pos;
+    bool    capture_mode;
+    bool    capture_wait_for_close;
 } term_state_t;
 
 static term_state_t term_state;
+static void terminal_paint(gui_window_t* w);
+static void terminal_on_key(gui_window_t* w, int key);
 
-extern void shell_execute_command(const char* cmd);
+void gui_terminal_capture_start(void) {
+    gui_window_t* w = gui_create_window("Terminal", 100, 100, 600, 400);
+    if (!w) return;
+    memset(&term_state, 0, sizeof(term_state));
+    term_state.output_pos = 0;
+    term_state.capture_mode = true;
+    term_state.capture_wait_for_close = false;
+    strcpy(term_state.output, "Program output:\n");
+    term_state.output_pos = strlen(term_state.output);
+    w->on_paint = terminal_paint;
+    w->on_key = terminal_on_key;
+}
+
+bool gui_terminal_capture_write(const char* buf, uint32_t count) {
+    if (!term_state.capture_mode) return false;
+    for (uint32_t i = 0; i < count; i++) {
+        if (term_state.output_pos + 1 >= TERM_OUTPUT_SIZE) break;
+        term_state.output[term_state.output_pos++] = buf[i];
+    }
+    term_state.output[term_state.output_pos] = '\0';
+    return true;
+}
+
+void gui_terminal_capture_finish(void) {
+    if (!term_state.capture_mode) return;
+    term_state.capture_wait_for_close = true;
+    const char* msg = "\nPress any key to close...\n";
+    gui_terminal_capture_write(msg, (uint32_t)strlen(msg));
+}
 
 static void terminal_paint(gui_window_t* w) {
     fb_rect_t cr = gui_client_rect(w);
@@ -521,11 +557,55 @@ static void terminal_paint(gui_window_t* w) {
         lines_shown++;
     }
     
+    if (term_state.capture_mode) {
+        fb_draw_hline(cr.x, y_pos, cr.w, 0x333333u);
+        y_pos += 4;
+        const char* prompt = term_state.capture_wait_for_close ? "Press any key to close..." : "Running...";
+        fb_draw_string(cr.x + 4, y_pos, prompt, 0x00FFFFu, 0, true);
+        return;
+    }
+
     /* Command input area */
     fb_draw_hline(cr.x, y_pos, cr.w, 0x333333u);
     y_pos += 4;
     fb_draw_string(cr.x + 4, y_pos, "> ", 0x00FF00u, 0, true);
     fb_draw_string(cr.x + 20, y_pos, term_state.cmd_buf, 0x00FFFFu, 0, true);
+}
+
+static void terminal_on_key(gui_window_t* w, int key) {
+    if (term_state.capture_mode) {
+        if (term_state.capture_wait_for_close) {
+            gui_close_window(w);
+            term_state.capture_mode = false;
+            term_state.capture_wait_for_close = false;
+        }
+        return;
+    }
+
+    if (key == '\r' || key == '\n' || key == KEY_KP_ENTER) {
+        /* Echo command to output */
+        term_state.cmd_buf[term_state.cmd_pos] = '\0';
+        if (term_state.cmd_pos > 0 && term_state.output_pos + term_state.cmd_pos + 3 < TERM_OUTPUT_SIZE) {
+            term_state.output[term_state.output_pos++] = '>';
+            term_state.output[term_state.output_pos++] = ' ';
+            strcpy(&term_state.output[term_state.output_pos], term_state.cmd_buf);
+            term_state.output_pos += strlen(term_state.cmd_buf);
+            term_state.output[term_state.output_pos++] = '\n';
+            term_state.output[term_state.output_pos] = '\0';
+        }
+        term_state.cmd_pos = 0;
+        term_state.cmd_buf[0] = '\0';
+    } else if (key == '\b' || key == KEY_BACKSPACE) {
+        if (term_state.cmd_pos > 0) {
+            term_state.cmd_pos--;
+            term_state.cmd_buf[term_state.cmd_pos] = '\0';
+        }
+    } else if (key >= 32 && key < 127) {
+        if (term_state.cmd_pos < 255) {
+            term_state.cmd_buf[term_state.cmd_pos++] = (char)key;
+            term_state.cmd_buf[term_state.cmd_pos] = '\0';
+        }
+    }
 }
 
 static void terminal_close(void* ud) {
@@ -541,6 +621,7 @@ gui_window_t* gui_create_terminal_window(void) {
     term_state.output_pos = strlen(term_state.output);
     
     w->on_paint = terminal_paint;
+    w->on_key = terminal_on_key;
     gui_add_button(w, 520, 365, 70, "Close", terminal_close, w);
     
     return w;

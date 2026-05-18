@@ -219,7 +219,7 @@ void net_udp_handle_packet(const ip4_header_t* iphdr, const udp_header_t* udphdr
 #define TCP_MAX_SOCKETS   8
 #define TCP_RX_BUF_SIZE   4096
 #define TCP_TX_BUF_SIZE   4096
-#define TCP_TIMEOUT_MS    30000    /* 30 seconds */
+#define TCP_TIMEOUT_MS    600000   /* 10 minutes - prevent WiFi disconnection during browsing */
 #define TCP_RETRANSMIT_MS 1000     /* 1 second */
 #define TCP_MAX_RETRIES   3
 

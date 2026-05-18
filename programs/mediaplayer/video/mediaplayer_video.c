@@ -290,7 +290,10 @@ void mediaplayer_video_run(const char* filepath) {
 
     /* Главный цикл */
     uint32_t last_tick = pit_get_ticks();
-    while (vp.running) {
+    uint32_t start_time = pit_get_ticks();
+    uint32_t timeout_ms = 120000;  /* 2 minute timeout */
+    
+    while (vp.running && (pit_get_ticks() - start_time < timeout_ms)) {
         vp_draw_image(&vp);
         vp_draw_toolbar(&vp);
         fb_swap();

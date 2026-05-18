@@ -352,13 +352,24 @@ void mediaplayer_audio_run(const char* filepath) {
     ap.sh = (int32_t)fb_height();
 
     /* Загружаем WAV */
-    load_wav(filepath, &ap.wav, &ap.audio_data);
+    int load_result = load_wav(filepath, &ap.wav, &ap.audio_data);
+    if (load_result != 0) {
+        /* Failed to load - show error and return quickly */
+        fb_fill_rect(0, 0, ap.sw, ap.sh, AP_BG);
+        fb_draw_string(20, 20, "Error: Cannot load audio file", 0xFF0000u, AP_BG, true);
+        fb_draw_string(20, 40, filepath, 0xFFFFFFu, AP_BG, true);
+        fb_swap();
+        pit_sleep(3000);  /* Show error for 3 seconds */
+        return;
+    }
 
     /* Главный цикл */
     uint32_t last_sample_tick = pit_get_ticks();
     uint32_t sample_interval = ap.wav.valid ? (1000 / (ap.wav.sample_rate / 100)) : 40;
+    uint32_t start_time = pit_get_ticks();
+    uint32_t timeout_ms = 120000;  /* 2 minute timeout */
 
-    while (ap.running) {
+    while (ap.running && (pit_get_ticks() - start_time < timeout_ms)) {
         /* Фон */
         fb_fill_rect(0, 0, ap.sw, ap.sh, AP_BG);
 

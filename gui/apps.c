@@ -7,7 +7,8 @@
 #include "../programs/games/games.h"
 #include "../programs/filemanager/filemanager.h"
 #include "../programs/browser/browser.h"
-#include "../programs/wordproc/wordproc.h"
+//#include "../programs/wordproc/wordproc.h"
+#include "../programs/shell/shell.h"
 #include "../programs/mediaplayer/video/mediaplayer_video.h"
 #include "../programs/mediaplayer/audio/mediaplayer_audio.h"
 #include "../programs/codeeditor/codeeditor.h"
@@ -246,19 +247,19 @@ static void sysinfo_close(void* ud){gui_close_window((gui_window_t*)ud);}
 /* ═══════════════════════════════════════════════════════════════════
  * Launchers
  * ═══════════════════════════════════════════════════════════════════ */
-static void launch_editor (void*ud){(void)ud; editor_run("/tmp/untitled.txt");}
+static void launch_editor (void*ud){(void)ud; editor_run("/tmp/untitled.cpp");}
 static void launch_snake  (void*ud){(void)ud; snake_run();}
 static void launch_tetris (void*ud){(void)ud; tetris_run();}
 static void launch_pong   (void*ud){(void)ud; pong_run();}
 static void launch_calc   (void*ud){(void)ud; app_calc_open();}
 static void launch_fm      (void*ud){(void)ud; filemanager_run("/");}
 static void launch_browser (void*ud){(void)ud;
-    browser_open("https://google.com");
+    browser_open("http://google.com");
 }
-static void launch_word    (void*ud){(void)ud; wordproc_open((char*)0);}
-static void launch_video   (void*ud){(void)ud; mediaplayer_video_run("/tmp/image.bmp");}
-static void launch_audio   (void*ud){(void)ud; mediaplayer_audio_run("/tmp/audio.wav");}
-static void launch_codeed  (void*ud){(void)ud; codeeditor_run("/tmp/untitled.c");}
+/*static void launch_word    (void*ud){(void)ud; wordproc_open((char*)0);}
+static void launch_video   (void*ud){(void)ud; mediaplayer_video_run("");}
+static void launch_audio   (void*ud){(void)ud; mediaplayer_audio_run("");}*/
+static void launch_codeed  (void*ud){(void)ud; codeeditor_run("");}
 static void launch_terminal(void*ud){(void)ud; gui_create_terminal_window();}
 static void launch_sysinfo(void*ud){
     (void)ud;
@@ -275,11 +276,11 @@ typedef struct { const char* name; const char* ltr; fb_color_t c; void(*fn)(void
 static const icon_t ICONS[]={
     {"Files",   "F", 0xE8A020u, launch_fm      },
     {"Browser", "W", 0x2060C0u, launch_browser },
-    {"Word",    "W", 0x2050A0u, launch_word    },
+   // {"Word",    "W", 0x2050A0u, launch_word    },
     {"Code",    "<", 0x2A8A4Au, launch_codeed  },
     {"Editor",  "E", 0x2B5EA7u, launch_editor  },
-    {"Video",   "V", 0xA02060u, launch_video   },
-    {"Audio",   "M", 0x6A2A8Au, launch_audio   },
+    //{"Video",   "V", 0xA02060u, launch_video   },
+    //{"Audio",   "M", 0x6A2A8Au, launch_audio   },
     {"Term",    ">", 0x1A1A2Au, launch_terminal},
     {"Calc",    "C", 0x2A8A4Au, launch_calc    },
     {"Snake",   "S", 0x8A2A2Au, launch_snake   },
@@ -293,9 +294,26 @@ static const icon_t ICONS[]={
 #define ICO_GAP 8
 
 void apps_draw_desktop_icons(void) {
-    int32_t sx=20, sy=48;
-    for(int i=0;i<ICON_N;i++){
-        int32_t ix=sx+i*(ICO_W+ICO_GAP), iy=sy;
+    uint32_t fw = fb_width();
+    uint32_t fh = fb_height();
+    
+    /* Calculate grid dimensions */
+    int32_t cols = (fw - 40) / (ICO_W + ICO_GAP);
+    if (cols < 1) cols = 1;
+    
+    int32_t margin_x = (fw - cols * (ICO_W + ICO_GAP) + ICO_GAP) / 2;
+    int32_t margin_y = 48;
+    
+    for(int i=0; i<ICON_N; i++){
+        int col = i % cols;
+        int row = i / cols;
+        
+        int32_t ix = margin_x + col * (ICO_W + ICO_GAP);
+        int32_t iy = margin_y + row * (ICO_H + ICO_GAP);
+        
+        /* Skip if off-screen */
+        if (iy + ICO_H > (int32_t)fh) continue;
+        
         fb_fill_round_rect(ix+2,iy+2,ICO_W,ICO_H-14,8,0x00000050u);
         fb_fill_round_rect(ix,iy,ICO_W,ICO_H-14,8,ICONS[i].c);
         /* Светлая грань сверху */
@@ -312,9 +330,22 @@ void apps_draw_desktop_icons(void) {
 }
 
 void apps_handle_icon_click(int32_t mx, int32_t my) {
-    int32_t sx=20, sy=48;
-    for(int i=0;i<ICON_N;i++){
-        int32_t ix=sx+i*(ICO_W+ICO_GAP), iy=sy;
+    uint32_t fw = fb_width();
+    
+    /* Calculate grid dimensions */
+    int32_t cols = (fw - 40) / (ICO_W + ICO_GAP);
+    if (cols < 1) cols = 1;
+    
+    int32_t margin_x = (fw - cols * (ICO_W + ICO_GAP) + ICO_GAP) / 2;
+    int32_t margin_y = 48;
+    
+    for(int i=0; i<ICON_N; i++){
+        int col = i % cols;
+        int row = i / cols;
+        
+        int32_t ix = margin_x + col * (ICO_W + ICO_GAP);
+        int32_t iy = margin_y + row * (ICO_H + ICO_GAP);
+        
         if(mx>=ix && mx<ix+ICO_W && my>=iy && my<iy+ICO_H){
             if(ICONS[i].fn) ICONS[i].fn((void*)0);
             return;

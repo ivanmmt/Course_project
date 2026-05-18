@@ -110,14 +110,14 @@ static void vfs_setup(void) {
     (void)bin;
 
     static const char readme[] =
-        "=== MyOS v0.1 — Steps 1-7 ===\n\n"
+        "=== MyOS v0.1 ===\n\n"
         "Subsystems:\n"
         "  GDT + IDT (Protected Mode)\n"
         "  PMM + VMM + Heap (Memory)\n"
         "  Framebuffer + Mouse + GUI\n"
         "  VFS + RamFS + ELF loader\n"
-        "  ATA/IDE + FAT32 (Step 7)\n\n"
-        "Shell commands: help, ls, cat, exec, mount, df\n";
+        "  ATA/IDE + FAT32 \n\n"
+        "Shell commands: help, ls, cat, exec, mount, df (NOW DONT WORK)\n";
 
     static const char motd[] =
         "Welcome to MyOS! Type 'help' for commands.\n";
@@ -157,7 +157,7 @@ static void draw_splash(void) {
     fb_draw_string_scaled(cx-62,cy-52,"My",FB_WHITE,3);
     fb_draw_string_scaled(cx-26,cy- 8,"OS",0x4FC3F7u,3);
     fb_draw_string(cx-108,cy+64,
-        "Educational x86 OS  —  Steps 1-7",0xCCDDEEu,0,true);
+        "Educational x86 OS",0xCCDDEEu,0,true);
     fb_fill_rect(cx-110,cy+112,220,10,0x1A3A5Au);
     fb_draw_rect(cx-110,cy+112,220,10,0x2A5A7Au);
     for(int i=0;i<=220;i++){
@@ -174,7 +174,7 @@ void kernel_main(uint32_t magic, multiboot2_info_t* mbi) {
     if (magic != 0x36d76289) kernel_panic("Not Multiboot2!");
 
     vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    vga_put_string(" MyOS v0.1  |  Steps 1-7: ATA + FAT32\n\n");
+    vga_put_string(" MyOS v0.1  |  ATA + FAT32\n\n");
     vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     log_step(1,"GDT...");       gdt_init();      log_ok("GDT");

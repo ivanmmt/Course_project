@@ -70,7 +70,7 @@ typedef uint32_t pte_t;  /* Page Table Entry */
  *
  * Мы используем identity mapping для простоты:
  * виртуальный адрес = физическому (1:1 mapping)
- * Это упрощает Step 3, в шагах с процессами добавим полноценный mapping.
+ * в шагах с процессами добавим полноценный mapping.
  * ============================================================================= */
 #define VMM_KERNEL_VIRT_BASE  0x00000000  /* identity map */
 #define VMM_USER_SPACE_END    0xBFFFFFFF

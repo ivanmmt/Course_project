@@ -19,27 +19,14 @@ bool usb_init(void) {
     memset(&usb_mass_storage, 0, sizeof(usb_mass_storage));
     usb_device_count = 0;
 
-    vga_put_string("  [USB] Initializing USB host controller...\n");
+    vga_put_string("  [USB] Scanning for USB devices (emulated)...\n");
 
-    /* For QEMU development, simulate USB mass storage device */
-    usb_mass_storage.present = true;
-    usb_mass_storage.device = &usb_devices[0];
-    usb_mass_storage.bulk_in.max_packet_size = 512;
-    usb_mass_storage.bulk_out.max_packet_size = 512;
-    usb_mass_storage.tag = 1;
-
-    /* Create virtual device */
-    usb_devices[0].addr = 1;
-    usb_devices[0].class = USB_CLASS_MASS_STORAGE;
-    usb_devices[0].subclass = USB_SUBCLASS_SCSI;
-    usb_devices[0].protocol = USB_PROTOCOL_BULK_ONLY;
-    usb_devices[0].vendor_id = 0x1234;
-    usb_devices[0].product_id = 0x5678;
-    usb_devices[0].max_packet_size = 64;
-    usb_devices[0].configured = true;
-    usb_device_count = 1;
-
-    vga_put_string("  [USB] Found virtual USB mass storage device\n");
+    /* Note: Full USB support requires UHCI/EHCI/XHCI controller drivers.
+     * Use 'qemu-system-i386 -usb -device usb-host,hostbus=X,hostaddr=Y' for real USB.
+     * For now, users should use ATA disks via '-hda disk.img' in QEMU.
+     */
+    
+    vga_put_string("  [USB] Tip: Use '-hda disk.img' for disk access instead of USB emulation\n");
     return true;
 }
 
@@ -52,5 +39,7 @@ bool usb_scan_devices(void) {
 
 /* Find mass storage device */
 usb_mass_storage_t* usb_find_mass_storage(void) {
-    return usb_mass_storage.present ? &usb_mass_storage : NULL;
+    /* Full USB support not yet implemented */
+    /* Return NULL - users should use ATA disks instead */
+    return NULL;
 }

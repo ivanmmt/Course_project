@@ -5,6 +5,7 @@
 
 #include "net.h"
 #include "../drivers/timer/pit.h"
+#include "../drivers/vga/vga_text.h"
 
 static bool net_stack_initialized = false;
 
@@ -13,12 +14,15 @@ void net_init(void) {
     if (net_stack_initialized)
         return;
     
+    vga_printf("[NET] Initializing network stack...\n");
+    
     /* Initialize each layer in order (bottom-up) */
     net_core_init();    /* Ethernet layer */
     net_arp_init();     /* ARP resolution */
     net_ip_init();      /* IPv4 routing */
     
     net_stack_initialized = true;
+    vga_printf("[NET] Stack initialized, ready=%d\n", net_stack_initialized);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */

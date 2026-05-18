@@ -10,6 +10,7 @@
 #include "../../drivers/keyboard/keyboard.h"
 #include "../../drivers/timer/pit.h"
 #include "../../drivers/framebuffer/framebuffer.h"
+#include "../../gui/gui.h"
 #include "../../filesystem/vfs.h"
 #include "../../memory/heap.h"
 #include "../../memory/pmm.h"
@@ -53,6 +54,10 @@ void syscall_handler_c(uint32_t num,
         if (!buf) { result = SYSCALL_EINVAL; break; }
 
         if (fd == STDOUT_FD || fd == STDERR_FD) {
+            if (gui_terminal_capture_write(buf, count)) {
+                result = (int32_t)count;
+                break;
+            }
             /* Пишем в VGA или framebuffer */
             if (fb_ready()) {
                 /* В графическом режиме — TODO: вывод через GUI консоль */

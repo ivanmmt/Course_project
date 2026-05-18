@@ -593,13 +593,13 @@ static void br_click(gui_window_t* win, int32_t lx, int32_t ly) {
 gui_window_t* browser_open(const char* start_url) {
     if (!fb_ready()) return (gui_window_t*)0;
 
-    /* Создаём окно */
+    /* Create fullscreen window */
     int32_t sw = (int32_t)fb_width();
     int32_t sh = (int32_t)fb_height();
     gui_window_t* win = gui_create_window(
         "MyBrowser",
-        20, 20,
-        sw - 40, sh - 60);
+        0, 0,
+        sw, sh);
     if (!win) return (gui_window_t*)0;
 
     /* Состояние */

@@ -5,33 +5,44 @@
 ifneq ($(shell which i686-elf-gcc 2>/dev/null),)
   CC            := i686-elf-gcc
   LD            := i686-elf-gcc
+  CXX           := i686-elf-g++
   COMPILER_TYPE := elf
 else ifneq ($(shell which i686-linux-gnu-gcc 2>/dev/null),)
   CC            := i686-linux-gnu-gcc
   LD            := i686-linux-gnu-gcc
+  CXX           := i686-linux-gnu-g++
   COMPILER_TYPE := linux-gnu
+else ifneq ($(shell which g++ 2>/dev/null),)
+  CC            := gcc
+  LD            := gcc
+  CXX           := g++
+  COMPILER_TYPE := native-m32
 else
   CC            := gcc
   LD            := gcc
+  CXX           := gcc
   COMPILER_TYPE := native-m32
 endif
 
 ASM  := nasm
 GRUB := grub-mkrescue
-$(info [CC] $(CC) [$(COMPILER_TYPE)])
+$(info [CC] $(CC) [$(COMPILER_TYPE)] [CXX] $(CXX))
 
 CFLAGS := -m32 -ffreestanding -fno-stack-protector -fno-pic -fno-pie \
           -no-pie -fno-builtin -fno-common \
           -Wall -Wno-switch -Wno-unused-function -Wno-unused-variable \
           -Wno-unused-label \
           -O2 -std=gnu11 \
-          -I. -Ikernel -Ikernel/syscall -Ikernel/process \
-          -Idrivers -Idrivers/net -Ilib -Imemory -Igui -Inet \
-          -Ifilesystem -Ifilesystem/fat32 -Ifilesystem/pe \
-          -Iprograms -Iprograms/shell -Iprograms/editor \
-          -Iprograms/games -Iprograms/filemanager -Iprograms/browser \
-          -Iprograms/wordproc -Iprograms/mediaplayer/video \
-          -Iprograms/mediaplayer/audio -Iprograms/codeeditor
+
+CXXFLAGS := $(filter-out -std=gnu11,$(CFLAGS)) -std=gnu++20 \
+            -fno-rtti -fno-exceptions \
+            -I. -Ikernel -Ikernel/syscall -Ikernel/process \
+            -Idrivers -Idrivers/net -Ilib -Imemory -Igui -Inet \
+            -Ifilesystem -Ifilesystem/fat32 -Ifilesystem/pe \
+            -Iprograms -Iprograms/shell -Iprograms/editor \
+            -Iprograms/games -Iprograms/filemanager -Iprograms/browser \
+            -Iprograms/wordproc -Iprograms/mediaplayer/video \
+            -Iprograms/mediaplayer/audio -Iprograms/codeeditor
 
 ifeq ($(COMPILER_TYPE),linux-gnu)
   CFLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include 2>/dev/null)
@@ -124,8 +135,23 @@ build/%.o: %.c | dirs
 	@echo "[CC]  $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
 
+build/%.o: %.cpp | dirs
+	@mkdir -p $(dir $@)
+	@echo "[CXX] $<"
+	@$(CXX) $(CXXFLAGS) -c $< -o $@
+
+build/%.o: %.cc | dirs
+	@mkdir -p $(dir $@)
+	@echo "[CXX] $<"
+	@$(CXX) $(CXXFLAGS) -c $< -o $@
+
+build/%.o: %.cxx | dirs
+	@mkdir -p $(dir $@)
+	@echo "[CXX] $<"
+	@$(CXX) $(CXXFLAGS) -c $< -o $@
+
 userspace:
-	@$(MAKE) -C userspace CC=$(CC)
+	@$(MAKE) -C userspace CC=$(CC) CXX=$(CXX) SRC=$(SRC)
 
 disk: $(DISK_IMG)
 $(DISK_IMG): | dirs
@@ -149,7 +175,7 @@ run: $(ISO_IMAGE) disk
 	  -cdrom $(ISO_IMAGE) \
 	  -hda $(DISK_IMG) \
 	  -m 256M \
-	  -device VGA,vgamem_mb=16 \
+	  -device qxl-vga,vram_size_mb=64 \
 	  -display sdl \
 	  -nic user,model=e1000 \
 	  -no-reboot

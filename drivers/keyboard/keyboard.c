@@ -151,6 +151,13 @@ static void keyboard_irq_handler(registers_t* regs) {
 
     if (released) return;
 
+    /* ─── Функциональные клавиши F1-F10 (скан-коды 0x3B-0x44) ─── */
+    if (code >= 0x3B && code <= 0x44) {
+        int fkey = code - 0x3B + 1;  /* F1=1, F2=2, ..., F10=10 */
+        buf_push(0x190 + fkey);      /* KEY_F1=0x191, KEY_F2=0x192, ... */
+        return;
+    }
+
     /* ─── NumPad (скан-коды 0x47-0x52) ─── */
     if (code >= 0x47 && code <= 0x52) {
         int digit = 0;
@@ -190,8 +197,10 @@ static void keyboard_irq_handler(registers_t* regs) {
         } else {
             base = scancode_to_ascii[code];
         }
-        if ((base >= 'a' && base <= 'z') || (base >= 'A' && base <= 'Z'))
-            buf_push((int16_t)((base | 0x20) - 'a' + 1));
+        if ((base >= 'a' && base <= 'z') || (base >= 'A' && base <= 'Z')) {
+            int ctrl_code = (base | 0x20) - 'a' + 1;
+            buf_push((int16_t)ctrl_code);
+        }
         return;
     }
 

@@ -127,6 +127,11 @@ void gui_draw_cursor(int32_t x, int32_t y);
 /* Создать терминальное окно */
 gui_window_t* gui_create_terminal_window(void);
 
+/* Создать терминальное окно для запуска кода */
+void gui_terminal_capture_start(void);
+bool gui_terminal_capture_write(const char* buf, uint32_t count);
+void gui_terminal_capture_finish(void);
+
 /* Создать WiFi выбора сетей */
 gui_window_t* gui_create_wifi_dialog(void);
 

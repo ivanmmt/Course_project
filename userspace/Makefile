@@ -8,15 +8,22 @@
 #   - Линкер скрипт гарантирует нужные адреса
 # =============================================================================
 
-ifneq ($(shell which i686-elf-gcc 2>/dev/null),)
-  CC := i686-elf-gcc
-  LD := i686-elf-gcc
-else ifneq ($(shell which i686-linux-gnu-gcc 2>/dev/null),)
-  CC := i686-linux-gnu-gcc
-  LD := i686-linux-gnu-gcc
+ifneq ($(shell which i686-elf-g++ 2>/dev/null),)
+  CXX := i686-elf-g++
+  CC  := i686-elf-gcc
+  LD  := i686-elf-gcc
+else ifneq ($(shell which i686-linux-gnu-g++ 2>/dev/null),)
+  CXX := i686-linux-gnu-g++
+  CC  := i686-linux-gnu-gcc
+  LD  := i686-linux-gnu-gcc
+else ifneq ($(shell which g++ 2>/dev/null),)
+  CXX := g++
+  CC  := gcc
+  LD  := gcc
 else
-  CC := gcc
-  LD := gcc
+  CXX := gcc
+  CC  := gcc
+  LD  := gcc
 endif
 
 # Флаги для userspace программ
@@ -27,8 +34,9 @@ CFLAGS_USER := \
     -fno-builtin \
     -fno-stack-protector \
     -Wall -O2 \
-    -std=c11 \
     -Ilibc
+
+CXXFLAGS_USER := $(CFLAGS_USER) -std=gnu++20 -fno-rtti -fno-exceptions
 
 # Для i686-linux-gnu-gcc нужно исключить системные заголовки
 ifeq ($(CC),i686-linux-gnu-gcc)
@@ -46,10 +54,16 @@ LDFLAGS_USER := \
 
 # Выходная директория
 OUT_DIR := ../build/userspace
+SRC ?=
+OUT ?= $(OUT_DIR)/$(notdir $(basename $(SRC))).elf
 
-.PHONY: all clean install hello demo
+.PHONY: all clean install hello demo compile
 
+ifeq ($(SRC),)
 all: $(OUT_DIR)/hello.elf $(OUT_DIR)/demo.elf
+else
+all: $(OUT)
+endif
 
 $(OUT_DIR):
 	@mkdir -p $(OUT_DIR)
@@ -65,7 +79,15 @@ $(OUT_DIR)/demo.elf: calc/demo.c libc/myos_libc.h userspace.ld | $(OUT_DIR)
 	@echo "[USER] Compiling demo.elf..."
 	@$(CC) $(CFLAGS_USER) $(LDFLAGS_USER) -o $@ calc/demo.c
 	@echo "[OK]   $@ ($$(du -sh $@ | cut -f1))"
+# ─── Компиляция произвольного файла в .elf ──────────────────────────────────────
+$(OUT): $(SRC) libc/myos_libc.h userspace.ld | $(OUT_DIR)
+	@echo "[USER] Compiling $(SRC) -> $@"
+	@$(if $(filter %.cpp %.CPP %.cc %.CC %.cxx %.CXX,$(SRC)),$(CXX),$(CC)) \
+	  $(if $(filter %.cpp %.CPP %.cc %.CC %.cxx %.CXX,$(SRC)),$(CXXFLAGS_USER),$(CFLAGS_USER)) \
+	  $(LDFLAGS_USER) -o $@ $(SRC)
+	@echo "[OK]   $@ ($$(du -sh $@ | cut -f1))"
 
+compile: all
 # ─── Копировать на FAT32 диск ────────────────────────────────────────────────
 DISK_IMG := ../build/disk.img
 

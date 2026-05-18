@@ -8,6 +8,7 @@
 #include "../memory/heap.h"
 #include "../lib/string.h"
 #include "../drivers/timer/pit.h"
+#include "../drivers/vga/vga_text.h"
 
 #define NET_FRAME_BUF_SIZE  2048
 #define NET_RX_FRAMES       16
@@ -29,12 +30,25 @@ static int rx_head = 0;
 void net_core_init(void) {
     if (net_initialized) return;
     
-    e1000_init();  /* Initialize NIC driver */
+    vga_printf("[NET_CORE] Checking e1000 driver...\n");
+    
+    /* Check if e1000 is present and already initialized by kernel */
+    if (!e1000_present()) {
+        vga_printf("[NET_CORE] ERROR: e1000 not present!\n");
+        return;  /* e1000 not available */
+    }
+    
+    vga_printf("[NET_CORE] e1000 found, reading MAC address...\n");
     
     /* Get MAC from hardware */
     our_mac = e1000_get_mac();
     
+    vga_printf("[NET_CORE] MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+               our_mac.b[0], our_mac.b[1], our_mac.b[2],
+               our_mac.b[3], our_mac.b[4], our_mac.b[5]);
+    
     net_initialized = true;
+    vga_printf("[NET_CORE] Initialized OK\n");
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */

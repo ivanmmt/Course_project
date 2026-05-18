@@ -29,8 +29,34 @@
 #include "../../drivers/mouse/mouse.h"
 #include "../../drivers/timer/pit.h"
 #include "../../filesystem/vfs.h"
+#include "../../filesystem/pe/pe.h"
+#include "../../kernel/process/process.h"
+#include "../../gui/gui.h"
 #include "../../memory/heap.h"
 #include "../../lib/string.h"
+
+static bool ce_ends_with(const char* str, const char* suffix) {
+    int slen = strlen(suffix);
+    int len = strlen(str);
+    if (len < slen) return false;
+    return strcmp(str + len - slen, suffix) == 0;
+}
+
+static bool ce_contains_keyword(const char* text, const char* keyword) {
+    if (!text || !keyword) return false;
+    int klen = 0;
+    while (keyword[klen]) klen++;
+    for (int i = 0; text[i]; i++) {
+        if (text[i] == keyword[0]) {
+            bool match = true;
+            for (int j = 0; j < klen; j++) {
+                if (text[i+j] != keyword[j]) { match = false; break; }
+            }
+            if (match) return true;
+        }
+    }
+    return false;
+}
 
 /* ─── Цвета темы (VS Code Dark+) ─── */
 #define CE_BG            0x1E1E1Eu
@@ -133,7 +159,9 @@ static const char* kw_cpp[] = {
     "extern","inline","volatile","unsigned","signed","long","short",
     "sizeof","goto","class","public","private","protected","virtual",
     "override","new","delete","this","template","namespace","using",
-    "try","catch","throw","noexcept","constexpr","auto","nullptr",
+    "try","catch","throw","noexcept","constexpr","consteval","constinit",
+    "concept","requires","co_await","co_yield","co_return","import","module",
+    "char8_t","char16_t","char32_t","nullptr","include",
     0
 };
 static const char* kw_python[] = {
@@ -193,8 +221,8 @@ static ce_lang_t detect_lang(const char* path) {
         if (path[i] == '.') { ext = path + i + 1; break; }
     if (!ext) return LANG_TEXT;
 
-    const char* c_exts[] = {"c","h","C","H",0};
-    const char* cpp_exts[] = {"cpp","hpp","cc","cxx","CPP","HPP","CC","CXX",0};
+    const char* c_exts[] = {"c","C",0};
+    const char* cpp_exts[] = {"cpp","hpp","h","cc","cxx","CPP","HPP","H","CC","CXX",0};
     const char* cs_exts[] = {"cs","CS",0};
     const char* py_exts[] = {"py","PY",0};
     const char* js_exts[] = {"js","JS",0};
@@ -396,12 +424,44 @@ static void ce_load_file(ce_state_t* ce, const char* path) {
     vfs_close(fd);
 }
 
+static const char* ce_lang_ext(ce_lang_t lang) {
+    switch (lang) {
+        case LANG_C:      return "c";
+        case LANG_CPP:    return "cpp";
+        case LANG_CS:     return "cs";
+        case LANG_PYTHON: return "py";
+        case LANG_JS:     return "js";
+        case LANG_TS:     return "ts";
+        case LANG_JAVA:   return "java";
+        case LANG_ASM:    return "asm";
+        case LANG_SHELL:  return "sh";
+        case LANG_HTML:   return "html";
+        case LANG_JSON:   return "json";
+        case LANG_XML:    return "xml";
+        default:         return "cpp";
+    }
+}
+
+static void ce_set_default_path(ce_file_t* f) {
+    if (f->path[0]) return;
+
+    const char* ext = ce_lang_ext(f->lang);
+    if (!f->lang || f->lang == LANG_TEXT) ext = "cpp";  /* Default to C++ */
+    snprintf(f->path, sizeof(f->path), "/tmp/untitled.%s", ext);
+    snprintf(f->name, sizeof(f->name), "untitled.%s", ext);
+}
+
+static void ce_save_as(ce_state_t* ce, const char* new_ext);
+
 static void ce_save_file(ce_state_t* ce) {
     ce_file_t* f = &ce->files[ce->active_file];
     if (!f->path[0]) {
-        strncpy(f->path, "/tmp/untitled.txt", 255);
-        strncpy(f->name, "untitled.txt", 127);
-        f->lang = LANG_TEXT;
+        ce_set_default_path(f);
+    }
+    
+    if (strcmp(f->name, "untitled.cpp") == 0 && f->lang != LANG_TEXT) {
+        ce_save_as(ce, ce_lang_ext(f->lang));
+        return;
     }
 
     int32_t fd = vfs_open(f->path, VFS_O_WRITE | VFS_O_CREATE | VFS_O_TRUNC);
@@ -415,6 +475,142 @@ static void ce_save_file(ce_state_t* ce) {
     vfs_close(fd);
     f->modified = false;
 }
+
+static void ce_save_as(ce_state_t* ce, const char* new_ext) {
+    ce_file_t* f = &ce->files[ce->active_file];
+    char new_path[256];
+    const char* source_path = f->path[0] ? f->path : "/tmp/untitled";
+
+    strncpy(new_path, source_path, sizeof(new_path) - 1);
+    new_path[sizeof(new_path)-1] = '\0';
+
+    int len = strlen(new_path);
+    int dot_pos = -1;
+    for (int i = len - 1; i >= 0; i--) {
+        if (new_path[i] == '.') { dot_pos = i; break; }
+        if (new_path[i] == '/' || new_path[i] == '\\') break;
+    }
+    if (dot_pos >= 0) {
+        new_path[dot_pos] = '\0';
+    }
+    strncat(new_path, ".", sizeof(new_path) - strlen(new_path) - 1);
+    strncat(new_path, new_ext, sizeof(new_path) - strlen(new_path) - 1);
+
+    strncpy(f->path, new_path, sizeof(f->path) - 1);
+    f->path[sizeof(f->path)-1] = '\0';
+    
+    const char* fn = f->path;
+    for (const char* p = f->path; *p; p++) if (*p == '/' || *p == '\\') fn = p + 1;
+    strncpy(f->name, fn, sizeof(f->name) - 1);
+    f->name[sizeof(f->name)-1] = '\0';
+    f->lang = detect_lang(f->path);
+
+    int32_t fd = vfs_open(f->path, VFS_O_WRITE | VFS_O_CREATE | VFS_O_TRUNC);
+    if (fd < 0) return;
+
+    for (int i = 0; i < f->line_count; i++) {
+        if (f->lines[i].text && f->lines[i].len > 0)
+            vfs_write(fd, f->lines[i].text, f->lines[i].len);
+        vfs_write(fd, "\n", 1);
+    }
+    vfs_close(fd);
+    f->modified = false;
+}
+
+static bool ce_is_binary(const char* path) {
+    return ce_ends_with(path, ".elf") || ce_ends_with(path, ".ELF") ||
+           ce_ends_with(path, ".exe") || ce_ends_with(path, ".EXE");
+}
+
+static void ce_execute_file(ce_state_t* ce) {
+    ce_file_t* f = &ce->files[ce->active_file];
+    
+    /* Если файл не сохранён, сохраняем его перед запуском */
+    if (!f->path[0]) {
+        /* Определяем язык из содержимого или используем язык редактора */
+        if (f->lang == LANG_TEXT) {
+            ce_lang_t detected = LANG_CPP;  /* Default to C++ */
+            for (int i = 0; i < f->line_count && i < 20; i++) {
+                char* text = f->lines[i].text;
+                if (!text || f->lines[i].len == 0) continue;
+                
+                if (ce_contains_keyword(text, "import ") || ce_contains_keyword(text, "def "))
+                    { detected = LANG_PYTHON; break; }
+                if (ce_contains_keyword(text, "#include"))
+                    { detected = LANG_CPP; break; }
+                if (ce_contains_keyword(text, "function ") || ce_contains_keyword(text, "console.log"))
+                    { detected = LANG_JS; break; }
+            }
+            f->lang = detected;
+        }
+        ce_set_default_path(f);
+        ce_save_file(ce);
+    } else {
+        ce_save_file(ce);
+    }
+
+    /* Show the terminal window and capture stdout/stderr */
+    gui_terminal_capture_start();
+
+    const char* exec_path = f->path;
+    bool source_file = !ce_is_binary(exec_path);
+
+    /* Prefer running a compiled companion for source files */
+    if (source_file) {
+        char alt_path[256];
+        strncpy(alt_path, f->path, sizeof(alt_path) - 1);
+        alt_path[sizeof(alt_path)-1] = '\0';
+        int dot_pos = -1;
+        for (int i = strlen(alt_path) - 1; i >= 0; i--) {
+            if (alt_path[i] == '.') { dot_pos = i; break; }
+            if (alt_path[i] == '/' || alt_path[i] == '\\') break;
+        }
+        if (dot_pos >= 0) {
+            alt_path[dot_pos] = '\0';
+            strncat(alt_path, ".elf", sizeof(alt_path) - strlen(alt_path) - 1);
+            if (vfs_exists(alt_path)) exec_path = alt_path;
+            else {
+                alt_path[dot_pos] = '\0';
+                strncat(alt_path, ".exe", sizeof(alt_path) - strlen(alt_path) - 1);
+                if (vfs_exists(alt_path)) exec_path = alt_path;
+            }
+        }
+    }
+
+    int exit_code = -1;
+    if (ce_ends_with(exec_path, ".elf") || ce_ends_with(exec_path, ".ELF")) {
+        exit_code = process_exec(exec_path, 0, NULL);
+    } else if (ce_ends_with(exec_path, ".exe") || ce_ends_with(exec_path, ".EXE")) {
+        pe_info_t pi = pe_load_file(exec_path);
+        if (pi.valid) {
+            exit_code = pe_exec(&pi, 0, NULL);
+        }
+    }
+
+    if (exit_code < 0) {
+        if (source_file) {
+            if (exec_path != f->path) {
+                const char* msg = "Found compiled binary, but execution failed.\n";
+                gui_terminal_capture_write(msg, (uint32_t)strlen(msg));
+            } else {
+                const char* msg = "Source files cannot be executed directly.\n";
+                gui_terminal_capture_write(msg, (uint32_t)strlen(msg));
+                const char* hint = "Compile your code externally to .elf or .exe and run that binary.\n";
+                gui_terminal_capture_write(hint, (uint32_t)strlen(hint));
+            }
+        } else {
+            const char* msg = "Binary execution failed. Check that the .elf/.exe file is valid.\n";
+            gui_terminal_capture_write(msg, (uint32_t)strlen(msg));
+        }
+    } else {
+        char buf[64];
+        int n = snprintf(buf, sizeof(buf), "\nProcess exited with code %d\n", exit_code);
+        if (n > 0) gui_terminal_capture_write(buf, (uint32_t)n);
+    }
+
+    gui_terminal_capture_finish();
+}
+
 
 /* ─── Отрисовка ─── */
 
@@ -575,8 +771,8 @@ static void ce_render(ce_state_t* ce) {
     }
     fb_draw_string(6, sy + 2, st, CE_STATUS_FG, CE_STATUS_BG, true);
 
-    const char* hints = "Ctrl+S Save  Ctrl+F Find  Ctrl+G Goto  Ctrl+Q Quit";
-    fb_draw_string(sw - 340, sy + 2, hints, 0xBBDDFFu, CE_STATUS_BG, true);
+    const char* hints = "Ctrl+S Save  Ctrl+R Run  Ctrl+F Find  Ctrl+G Goto  Ctrl+Q Quit";
+    fb_draw_string(sw - 440, sy + 2, hints, 0xBBDDFFu, CE_STATUS_BG, true);
 
     fb_swap();
 }
@@ -587,7 +783,12 @@ static void ce_handle_key(ce_state_t* ce, int c) {
     ce_file_t* f = &ce->files[ce->active_file];
 
     if (c == 19) { ce_save_file(ce); return; }  /* Ctrl+S */
+    if (c == 18) { ce_execute_file(ce); return; }  /* Ctrl+R */
+    if (c == KEY_F2) { ce_save_as(ce, ce_lang_ext(f->lang)); return; }  /* F2 Save As */
+    if (c == KEY_F5) { ce_execute_file(ce); return; }  /* F5 Run */
     if (c == 17) { ce->running = false; return; }  /* Ctrl+Q */
+    if (c == 27) { ce->running = false; return; }  /* ESC */
+    if (c == KEY_ESCAPE) { ce->running = false; return; }  /* ESC key */
 
     if (c == KEY_ARROW_UP) {
         if (ce->cur_line > 0) ce->cur_line--;
@@ -687,11 +888,14 @@ gui_window_t* codeeditor_open(const char* filepath) {
     if (filepath && filepath[0])
         ce_load_file(ce, filepath);
     else {
-        ce->files[0].lines = (ce_line_t*)kmalloc(sizeof(ce_line_t));
+        /* Allocate space for 4096 lines (like ce_load_file does) */
+        ce->files[0].lines = (ce_line_t*)kmalloc(sizeof(ce_line_t) * 4096);
+        if (!ce->files[0].lines) { kfree(ce); return (gui_window_t*)0; }
         ce_line_init(&ce->files[0].lines[0]);
         ce->files[0].line_count = 1;
-        ce->files[0].lang = LANG_TEXT;
-        strncpy(ce->files[0].name, "untitled.txt", 127);
+        ce->files[0].lang = LANG_CPP;  /* Default: C++ */
+        strncpy(ce->files[0].path, "/tmp/untitled.cpp", 127);
+        strncpy(ce->files[0].name, "untitled.cpp", 127);
     }
 
     ce->running = true;
