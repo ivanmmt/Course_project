@@ -161,9 +161,12 @@ void net_ip_handle_packet(const void* pkt, int len) {
     case IP_PROTO_TCP:
         if (payload_len >= (int)sizeof(tcp_header_t)) {
             const tcp_header_t* tcphdr = (const tcp_header_t*)payload;
+            int tcp_hdr_len = (tcphdr->data_offset >> 4) * 4;
+            if (tcp_hdr_len < TCP_HDR_MIN_LEN) tcp_hdr_len = TCP_HDR_MIN_LEN;
+            if (tcp_hdr_len > payload_len) break;
             net_tcp_handle_packet(iphdr, tcphdr,
-                                  (const uint8_t*)payload + sizeof(tcp_header_t),
-                                  payload_len - sizeof(tcp_header_t));
+                                  (const uint8_t*)payload + tcp_hdr_len,
+                                  payload_len - tcp_hdr_len);
         }
         break;
     default:

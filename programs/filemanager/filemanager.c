@@ -80,6 +80,7 @@ typedef struct {
     bool     is_exe;   /* ELF или PE */
     bool     is_pe;    /* Windows PE */
     bool     is_text;
+    bool     is_doc;
     bool     is_code;
     bool     is_image;
 } fm_entry_t;
@@ -209,7 +210,7 @@ static void fm_detect_type(fm_entry_t* e) {
              strcmp(ext,"docx")==0 || strcmp(ext,"DOCX")==0 ||
              strcmp(ext,"rtf")==0  || strcmp(ext,"RTF")==0 ||
              strcmp(ext,"odt")==0  || strcmp(ext,"ODT")==0 ||
-             strcmp(ext,"pdf")==0  || strcmp(ext,"PDF")==0) { e->is_text=true; }
+             strcmp(ext,"pdf")==0  || strcmp(ext,"PDF")==0) { e->is_doc=true; }
     /* Архивы */
     else if (strcmp(ext,"zip")==0  || strcmp(ext,"ZIP")==0 ||
              strcmp(ext,"rar")==0  || strcmp(ext,"RAR")==0 ||
@@ -483,8 +484,6 @@ static void fm_draw_list(void) {
                 const char* asm2[]={"asm","s","S","ASM",0};
                 for (int k=0;code[k];k++) { if (strcmp(ext2,code[k])==0) { type_str="Code"; goto done_type; } }
                 for (int k=0;asm2[k];k++) { if (strcmp(ext2,asm2[k])==0) { type_str="ASM"; goto done_type; } }
-                for (int k=0;vids[k];k++) { if (strcmp(ext2,vids[k])==0) { type_str="Video"; goto done_type; } }
-                for (int k=0;auds[k];k++) { if (strcmp(ext2,auds[k])==0) { type_str="Audio"; goto done_type; } }
                 for (int k=0;docs[k];k++) { if (strcmp(ext2,docs[k])==0) { type_str="Doc"; goto done_type; } }
             }
         }
@@ -672,48 +671,19 @@ static void fm_open_selected(void) {
         return;
     }
 
-    /* Видео файл — открываем в видеоплеере */
-    const char* vid_exts[] = {"mp4","MP4","avi","AVI","mkv","MKV","mov","MOV","wmv","WMV","flv","FLV","webm","WEBM",0};
-    for (int i = 0; vid_exts[i]; i++) {
-        const char* n2 = e->name; int ln2 = strlen(n2);
-        for (int j = ln2-1; j >= 0; j--) {
-            if (n2[j]=='.') {
-                if (strcmp(n2+j+1,vid_exts[i])==0) {
-                    extern void mediaplayer_video_run(const char* filepath);
-                    char fp[FM_PATH_MAX];
-                    strncpy(fp,fm.current_path,FM_PATH_MAX-1);
-                    if (strcmp(fp,"/")!=0) strncat(fp,"/",2);
-                    strncat(fp,e->name,FM_PATH_MAX-strlen(fp)-1);
-                    mediaplayer_video_run(fp);
-                    return;
-                }
-                break;
-            }
-        }
+    if (e->is_doc) {
+        extern void wordproc_run(const char* filepath);
+        char full_path[FM_PATH_MAX];
+        strncpy(full_path, fm.current_path, FM_PATH_MAX-1);
+        if (strcmp(full_path,"/")!=0) strncat(full_path,"/",2);
+        strncat(full_path, e->name, FM_PATH_MAX-strlen(full_path)-1);
+        wordproc_run(full_path);
+        return;
     }
 
-    /* Аудио файл — открываем в аудиоплеере */
-    const char* aud_exts[] = {"mp3","MP3","wav","WAV","ogg","OGG","flac","FLAC","aac","AAC","wma","WMA","midi","MIDI","mid","MID",0};
-    for (int i = 0; aud_exts[i]; i++) {
-        const char* n2 = e->name; int ln2 = strlen(n2);
-        for (int j = ln2-1; j >= 0; j--) {
-            if (n2[j]=='.') {
-                if (strcmp(n2+j+1,aud_exts[i])==0) {
-                    extern void mediaplayer_audio_run(const char* filepath);
-                    char fp[FM_PATH_MAX];
-                    strncpy(fp,fm.current_path,FM_PATH_MAX-1);
-                    if (strcmp(fp,"/")!=0) strncat(fp,"/",2);
-                    strncat(fp,e->name,FM_PATH_MAX-strlen(fp)-1);
-                    mediaplayer_audio_run(fp);
-                    return;
-                }
-                break;
-            }
-        }
-    }
 
     /* Документ — открываем в word процессоре */
-    const char* doc_exts[] = {"doc","DOC","docx","DOCX","rtf","RTF","odt","ODT","pdf","PDF",0};
+    /*const char* doc_exts[] = {"doc","DOC","docx","DOCX","rtf","RTF","odt","ODT","pdf","PDF",0};
     for (int i = 0; doc_exts[i]; i++) {
         const char* n2 = e->name; int ln2 = strlen(n2);
         for (int j = ln2-1; j >= 0; j--) {
@@ -730,7 +700,7 @@ static void fm_open_selected(void) {
                 break;
             }
         }
-    }
+    }*/
 
     /* Обновляем статус */
     char* s = fm.status_text;

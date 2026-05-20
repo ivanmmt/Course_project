@@ -469,7 +469,7 @@ static void wp_draw_statusbar(wp_state_t* wp) {
     fb_draw_string(x + 6, y + 4, st, 0x444444u, WP_STATUS_BG, true);
 
     /* Подсказки */
-    const char* hints = "Ctrl+S Save  Ctrl+B Bold  Ctrl+I Italic  Ctrl+U Underline";
+    const char* hints = "Ctrl+Q Quit  Ctrl+S Save  Ctrl+J Bold Ctrl+U Underline";
     int32_t hw = (int32_t)strlen(hints) * FB_FONT_W;
     fb_draw_string(x + w - hw - 6, y + 4, hints, 0x999999u, WP_STATUS_BG, true);
 }
@@ -532,21 +532,25 @@ static void wp_handle_key(wp_state_t* wp, int c) {
     /* Ctrl+S Save */
     if (c == 19) { wp_save_file(wp); return; }
     /* Ctrl+B Bold */
-    if (c == 2 && wp->cur_block >= 0) {
+    if (c == 10 && wp->cur_block >= 0) {
         wp->blocks[wp->cur_block].style ^= STYLE_BOLD;
         wp->modified = true;
         return;
     }
-    /* Ctrl+I Italic */
-    if (c == 9 && wp->cur_block >= 0) {
-        wp->blocks[wp->cur_block].style ^= STYLE_ITALIC;
-        wp->modified = true;
-        return;
-    }
+    
     /* Ctrl+U Underline */
     if (c == 21 && wp->cur_block >= 0) {
         wp->blocks[wp->cur_block].style ^= STYLE_UNDERL;
         wp->modified = true;
+        return;
+    }
+    if (c == 17) { wp->running = false; return; }
+    if (c == 8 || c == KEY_DELETE || c == '\n' || c == '\r' || c == KEY_KP_ENTER ||
+        c == KEY_ARROW_UP || c == KEY_ARROW_DOWN || c == KEY_ARROW_LEFT || c == KEY_ARROW_RIGHT) {
+        /* Навигация и редактирование */
+    } else if (c >= 32 && c <= 126) {
+        /* Ввод текста */
+    } else {
         return;
     }
 
@@ -790,7 +794,7 @@ gui_window_t* wordproc_open(const char* filepath) {
         wp_load_file(wp, filepath);
     } else {
         wp_block_new(wp);
-        strncpy(wp->filename, "/tmp/document.txt", 255);
+        strncpy(wp->filename, "/tmp/document.doc", 255);
     }
 
     wp_recalc_pages(wp);

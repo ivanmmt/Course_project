@@ -7,10 +7,8 @@
 #include "../programs/games/games.h"
 #include "../programs/filemanager/filemanager.h"
 #include "../programs/browser/browser.h"
-//#include "../programs/wordproc/wordproc.h"
+#include "../programs/wordproc/wordproc.h"
 #include "../programs/shell/shell.h"
-#include "../programs/mediaplayer/video/mediaplayer_video.h"
-#include "../programs/mediaplayer/audio/mediaplayer_audio.h"
 #include "../programs/codeeditor/codeeditor.h"
 #include "../drivers/framebuffer/framebuffer.h"
 #include "../drivers/timer/pit.h"
@@ -256,9 +254,7 @@ static void launch_fm      (void*ud){(void)ud; filemanager_run("/");}
 static void launch_browser (void*ud){(void)ud;
     browser_open("http://google.com");
 }
-/*static void launch_word    (void*ud){(void)ud; wordproc_open((char*)0);}
-static void launch_video   (void*ud){(void)ud; mediaplayer_video_run("");}
-static void launch_audio   (void*ud){(void)ud; mediaplayer_audio_run("");}*/
+static void launch_word    (void*ud){(void)ud; wordproc_open((char*)0);}
 static void launch_codeed  (void*ud){(void)ud; codeeditor_run("");}
 static void launch_terminal(void*ud){(void)ud; gui_create_terminal_window();}
 static void launch_sysinfo(void*ud){
@@ -275,12 +271,10 @@ static void launch_sysinfo(void*ud){
 typedef struct { const char* name; const char* ltr; fb_color_t c; void(*fn)(void*); } icon_t;
 static const icon_t ICONS[]={
     {"Files",   "F", 0xE8A020u, launch_fm      },
-    {"Browser", "W", 0x2060C0u, launch_browser },
-   // {"Word",    "W", 0x2050A0u, launch_word    },
+    {"Browser", "B", 0x2060C0u, launch_browser },
+    {"Word",    "W", 0x2050A0u, launch_word    },
     {"Code",    "<", 0x2A8A4Au, launch_codeed  },
     {"Editor",  "E", 0x2B5EA7u, launch_editor  },
-    //{"Video",   "V", 0xA02060u, launch_video   },
-    //{"Audio",   "M", 0x6A2A8Au, launch_audio   },
     {"Term",    ">", 0x1A1A2Au, launch_terminal},
     {"Calc",    "C", 0x2A8A4Au, launch_calc    },
     {"Snake",   "S", 0x8A2A2Au, launch_snake   },
@@ -288,7 +282,7 @@ static const icon_t ICONS[]={
     {"Pong",    "P", 0x8A6A2Au, launch_pong    },
     {"Info",    "i", 0x3A6A7Au, launch_sysinfo },
 };
-#define ICON_N  13
+#define ICON_N  ((int)(sizeof(ICONS) / sizeof(ICONS[0])))
 #define ICO_W   72
 #define ICO_H   76
 #define ICO_GAP 8

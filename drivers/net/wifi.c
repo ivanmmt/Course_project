@@ -227,12 +227,13 @@ bool wifi_connect(const char* ssid, const char* password, wifi_security_t securi
     }
 
     /* Используем DHCP для получения IP адреса */
-    vga_put_string("  [WiFi] Requesting IP (DHCP)...\n");
-    pit_sleep(200);  /* Имитация DHCP handshake */
+    /* В QEMU реальная сеть идёт через e1000 (10.0.2.15), WiFi — UI-оболочка */
+    vga_put_string("  [WiFi] Using Ethernet (e1000) for Internet access\n");
+    pit_sleep(50);
 
     wifi.status = WIFI_CONNECTED;
     vga_printf("  [WiFi] Connected to %s\n", ssid);
-    vga_printf("  [WiFi] Connection stable (no auto-disconnect)\n");
+    vga_printf("  [WiFi] IP via Ethernet: use Browser with https://...\n");
     return true;
 }
 
@@ -288,8 +289,9 @@ void wifi_get_networks(wifi_network_t* out_nets, int* count) {
 }
 
 uint32_t wifi_get_ip(void) {
-    /* В полной реализации: возвращает IP полученный через DHCP */
-    return IP4(192, 168, 1, 100);  /* Stub IP */
+    if (wifi.status == WIFI_CONNECTED)
+        return net_get_ip();
+    return IP4(0, 0, 0, 0);
 }
 
 void wifi_dump_status(void) {

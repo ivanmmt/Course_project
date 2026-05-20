@@ -41,8 +41,7 @@ CXXFLAGS := $(filter-out -std=gnu11,$(CFLAGS)) -std=gnu++20 \
             -Ifilesystem -Ifilesystem/fat32 -Ifilesystem/pe \
             -Iprograms -Iprograms/shell -Iprograms/editor \
             -Iprograms/games -Iprograms/filemanager -Iprograms/browser \
-            -Iprograms/wordproc -Iprograms/mediaplayer/video \
-            -Iprograms/mediaplayer/audio -Iprograms/codeeditor
+
 
 ifeq ($(COMPILER_TYPE),linux-gnu)
   CFLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include 2>/dev/null)
@@ -81,10 +80,9 @@ SRCS_C := \
   programs/filemanager/filemanager.c \
   programs/browser/browser.c \
   programs/wordproc/wordproc.c \
-  programs/mediaplayer/video/mediaplayer_video.c \
-  programs/mediaplayer/audio/mediaplayer_audio.c \
   programs/codeeditor/codeeditor.c \
-  lib/string.c lib/divdi3.c
+  lib/string.c lib/divdi3.c \
+  lib/sha256.c lib/aes.c lib/rsa.c
 
 OBJS_ASM := $(patsubst %.asm,build/%.o,$(SRCS_ASM))
 OBJS_C   := $(patsubst %.c,  build/%.o,$(SRCS_C))
@@ -109,7 +107,6 @@ dirs:
 	  build/programs/shell build/programs/editor build/programs/games \
 	  build/programs/filemanager build/programs/browser \
 	  build/programs/wordproc \
-	  build/programs/mediaplayer/video build/programs/mediaplayer/audio \
 	  build/programs/codeeditor \
 	  build/lib build/iso/boot/grub build/userspace
 
@@ -177,8 +174,11 @@ run: $(ISO_IMAGE) disk
 	  -m 256M \
 	  -device qxl-vga,vram_size_mb=64 \
 	  -display sdl \
-	  -nic user,model=e1000 \
+	  -netdev user,id=net0,dns=8.8.8.8 \
+	  -device e1000,netdev=net0 \
 	  -no-reboot
+
+run-net: run
 
 run-nox: $(ISO_IMAGE)
 	qemu-system-i386 -cdrom $(ISO_IMAGE) -m 256M -nographic -no-reboot

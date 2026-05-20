@@ -16,8 +16,6 @@
 #include "../../kernel/process/process.h"
 #include "../../programs/browser/browser.h"
 #include "../../programs/wordproc/wordproc.h"
-#include "../../programs/mediaplayer/video/mediaplayer_video.h"
-#include "../../programs/mediaplayer/audio/mediaplayer_audio.h"
 #include "../../programs/codeeditor/codeeditor.h"
 #include "../../lib/string.h"
 #include "../../net/net.h"
@@ -261,8 +259,6 @@ static void cmd_help(void) {
         "    browser [url]   open browser\n"
         "    word [file]     word processor\n"
         "    code [file]     code editor\n"
-        "    video [file]    video player\n"
-        "    audio [file]    audio player\n"
     );
 
     vga_set_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
@@ -380,14 +376,6 @@ void shell_run(void) {
             extern void wordproc_run(const char* f);
             wordproc_run(argc > 1 ? argv[1] : "/tmp/doc.txt");
         }
-       /* else if (strcmp(argv[0], "video") == 0) {
-            extern void mediaplayer_video_run(const char* f);
-            mediaplayer_video_run(argc > 1 ? argv[1] : "/tmp/image.bmp");
-        }
-        else if (strcmp(argv[0], "audio") == 0) {
-            extern void mediaplayer_audio_run(const char* f);
-            mediaplayer_audio_run(argc > 1 ? argv[1] : "/tmp/audio.wav");
-        }*/
         else if (strcmp(argv[0], "code") == 0) {
             extern void codeeditor_run(const char* f);
             codeeditor_run(argc > 1 ? argv[1] : "/tmp/file.c");

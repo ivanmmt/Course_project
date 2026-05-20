@@ -306,9 +306,6 @@ static void br_navigate(br_state_t* br, const char* url) {
                 strcpy(br->lines[br->line_count++].text,
                        "Trying HTTP fallback (port 80)...");
 
-                char http_url[512];
-                strcpy(http_url, "https://");
-                strncat(http_url, after_scheme, 400);
                 int n2 = net_http_get(host, 80, path, buf, BR_BUF_SIZE-1, 10000);
                 if (n2 > 0) {
                     buf[n2] = '\0';

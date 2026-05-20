@@ -66,7 +66,7 @@ int net_tcp_connect(int sock, ip4_addr_t ip, uint16_t port, uint32_t timeout_ms)
     s->ack = 0;
     s->peer_seq = 0;
     s->peer_ack = 0;
-    s->peer_window = 65536;
+    s->peer_window = 65535;
     s->timeout_ms = timeout_ms;
     s->last_activity = (pit_get_ticks() * 1000) / 100;
     
@@ -85,7 +85,8 @@ int net_tcp_connect(int sock, ip4_addr_t ip, uint16_t port, uint32_t timeout_ms)
     
     if (net_ip_send(ip, IP_PROTO_TCP, &syn, sizeof(syn)) < 0)
         return -1;
-    
+
+    s->seq++;  /* SYN consumes one sequence number */
     s->state = TCP_SYN_SENT;
     s->last_tx_time = (pit_get_ticks() * 1000) / 100;
     s->retry_count = 0;
@@ -195,8 +196,11 @@ int net_tcp_recv(int sock, void* buf, uint32_t maxlen, uint32_t timeout_ms) {
             
             s->rx_head = (s->rx_head + copy_len) % TCP_RX_BUF_SIZE;
             s->last_activity = (pit_get_ticks() * 1000) / 100;
-            return copy_len;
+            return (int)copy_len;
         }
+
+        if (s->state == TCP_CLOSE_WAIT || s->state == TCP_FIN_WAIT_2)
+            return 0;
         
         uint32_t elapsed = (pit_get_ticks() * 1000) / 100 - start;
         if (elapsed >= timeout_ms)
@@ -277,7 +281,7 @@ void net_tcp_handle_packet(const ip4_header_t* iphdr, const tcp_header_t* tcphdr
     case TCP_SYN_SENT:
         if ((flags & TCP_FLAG_SYN) && (flags & TCP_FLAG_ACK)) {
             /* SYN-ACK received */
-            s->peer_seq = seq;
+            s->peer_seq = seq + 1;
             s->peer_ack = ack;
             s->peer_window = ntohs(tcphdr->window);
             s->ack = seq + 1;
@@ -308,9 +312,10 @@ void net_tcp_handle_packet(const ip4_header_t* iphdr, const tcp_header_t* tcphdr
         
         if (len > 0) {
             /* Data received, store in RX buffer */
-            uint32_t space = (s->rx_head > s->rx_tail) ?
-                            (s->rx_head - s->rx_tail - 1) :
-                            (TCP_RX_BUF_SIZE - s->rx_tail + s->rx_head - 1);
+            uint32_t used = (s->rx_tail >= s->rx_head) ?
+                            (s->rx_tail - s->rx_head) :
+                            (TCP_RX_BUF_SIZE - s->rx_head + s->rx_tail);
+            uint32_t space = TCP_RX_BUF_SIZE - used - 1;
             
             if (space >= (uint32_t)len) {
                 if ((s->rx_tail + len) <= TCP_RX_BUF_SIZE) {
@@ -321,8 +326,8 @@ void net_tcp_handle_packet(const ip4_header_t* iphdr, const tcp_header_t* tcphdr
                     memcpy(s->rx_buf, (const uint8_t*)payload + first, len - first);
                 }
                 s->rx_tail = (s->rx_tail + len) % TCP_RX_BUF_SIZE;
-                s->peer_seq += len;
-                s->ack = s->peer_seq;
+                s->ack = seq + (uint32_t)len;
+                s->peer_seq = s->ack;
                 
                 /* Send ACK */
                 tcp_header_t ack_pkt;

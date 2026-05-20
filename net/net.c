@@ -4,6 +4,7 @@
  * ============================================================================= */
 
 #include "net.h"
+#include "../drivers/net/e1000.h"
 #include "../drivers/timer/pit.h"
 #include "../drivers/vga/vga_text.h"
 
@@ -35,7 +36,7 @@ void net_poll(void) {
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 bool net_ready(void) {
-    return net_stack_initialized;
+    return net_stack_initialized && e1000_present();
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
