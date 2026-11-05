@@ -1,5 +1,5 @@
 /* =============================================================================
- * kernel/kernel.c  —  Steps 1-7: Memory + FS + GUI + ATA + FAT32 + WiFi
+ * kernel/kernel.c  — Memory + FS + GUI + ATA + FAT32 + WiFi
  * ============================================================================= */
 #include "kernel.h"
 #include "gdt.h"
